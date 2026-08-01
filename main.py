@@ -1,27 +1,37 @@
-import json
 import ollama
 import sqlite3
-git config --global user.name "MacElyon"
-$ git config --global user.email macelyon@gmail.com
 
 class Memory:
     def __init__(self):
         self.conn = sqlite3.connect('memory.db')
         self.cursor = self.conn.cursor()
-        self.file = "memory.json"
+        self.create_table()
+        
+    def create_table(self):
+        self.cursor.execute("""CREATE TABLE IF NOT EXISTS messages(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role TEXT,
+            content TEXT
+        )""")
+
+        self.conn.commit()
 
     def load_memory(self):
-        try:
-            with open(self.file, "r") as file:
-                return json.load(file)
+        self.cursor.execute("SELECT role, content FROM messages")
 
-        except FileNotFoundError:
-            return []#handle the case where the file doesn't exist yet by saving the conversation to an empty list
+        rows = self.cursor.fetchall()
+
+        messages = []
+
+        for role, content in rows:
+            messages.append({"role" : role, "content": content})
+        return messages
+        
     
-    def save_memory(self,conversation):
-        with open(self.file, "w") as file:
-            json.dump(conversation, file,indent=4)#save the updated conversation history to memory.json with indentation for readability
-
+    def save_memory(self, message):
+        self.cursor.execute("INSERT INTO messages (role, content) VALUES(?, ?)", (message["role"], message["content"]))
+        self.conn.commit()
+        
 class Brain:
     def __init__(self):
         self.model = "llama3.2:3b"
@@ -57,8 +67,7 @@ class Brain:
         """
 
     def think(self, conversation):
-        system_message = [{"role": "system", "content": self.system_prompt}]
-        messages = system_message + conversation
+        messages = [{"role": "system", "content": self.system_prompt}] + conversation
         response = ollama.chat(model=self.model, messages= messages) #initialize the ollama chat model with the conversation history
         return response["message"]["content"]
 
@@ -70,11 +79,15 @@ class Conversation:
             self.messages = saved_messages
 
     def add_user_message(self,user_input):
-        self.messages.append({"role": "user", "content": user_input})#save user input to conversation
+        messages = {"role": "user", "content": user_input}
+        self.messages.append(messages)#save user input to conversation
+        return messages
 
 
     def add_assistant_message(self,answer):
-        self.messages.append({"role": "assistant", "content": answer})#save assistant response to conversation1
+        messages = {"role": "assistant", "content": answer}
+        self.messages.append(messages)#save assistant response to conversation1
+        return messages
 
     def get_messages(self):
         return self.messages.copy()
@@ -95,13 +108,14 @@ class Ayo:
             if user_input.lower() == "quit":#end loop
                 break
 
-            self.conversation.add_user_message(user_input)#save user input to conversation
+            user_message = self.conversation.add_user_message(user_input)
+            self.memory.save_memory(user_message)#save user input to conversation
 
             answer = self.brain.think(self.conversation.get_messages())
             print(f"Ayo: {answer}")
     
-            self.conversation.add_assistant_message(answer)#save assistant response to conversation1
-            self.memory.save_memory(self.conversation.get_messages())
+            assistant_message = self.conversation.add_assistant_message(answer)#save assistant response to conversation1
+            self.memory.save_memory(assistant_message)
 
 def main():
     ayo = Ayo()
