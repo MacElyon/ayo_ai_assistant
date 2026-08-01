@@ -1,3 +1,4 @@
 memory.json
 memory.db
 __pycache__/
+env/
