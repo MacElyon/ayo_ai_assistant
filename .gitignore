@@ -1,4 +1,7 @@
 memory.json
-memory.db
 __pycache__/
 env/
+gui.py
+credentials.json
+token.json
+*.db
