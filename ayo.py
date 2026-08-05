@@ -1,6 +1,9 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import ollama
 import sqlite3
 from Tools.calendar import CalendarTool
+
 class Memory:
     def __init__(self):
         self.conn = sqlite3.connect('memory.db')
@@ -33,43 +36,95 @@ class Memory:
         self.conn.commit()
         
 class Brain:
-    def __init__(self):
-        self.model = "llama3.2:3b"
-        self.system_prompt = """You are an AI assistant named Ayo. 
+    def __init__(self, calendar):
+        self.model = "qwen2.5:7b"
+        self.calendar = calendar
+        self.available_functions = {
+            "get_events": self.calendar.get_events,
+            "schedule_event": self.calendar.schedule_event,
+            "delete_event": self.calendar.delete_event
+            }
 
-        Your core behaviours are being:
-        calm, precise, and efficient.
-        Minimal words, with maximum clarity and helpfulness
-        Slightly formal, never verbose
-        Rare and subtle dry humor
+    def build_system_prompt(self):
+        now = datetime.now(ZoneInfo("America/New_York")).strftime("%A, %B %d, %Y, %I:%M %p")
+        return f"""
+        You are Ayo, a personal AI assistant.
 
-        Addressing the user:
-        Always address as "sir"
-        Using "sir" only when appropriate and not excessively
+        Today's date and time is {now} (America/New_York)
+        Interpret words such as "today", "tomorrow", and "next Monday" relative to this date.
+        
 
-        Response Style:
-        Speak in 1-4 sentences
-        Only go beyond that range if explicitly asked
-        No filler or repitition
-        No emojis
+        Your highest priority is to respond naturally and helpfully.
 
-        Interaction:
-        If the user is inefficient or incorrect:
-            respond with “That approach is suboptimal, sir. I recommend…”
+        Greeting behavior:
+        - Always reply to greetings.
+        - A simple "Hello, sir." is sufficient.
 
-        Language:
-        Clean, neutral
+        Calendar deletion behavior:
+        - Users do not know calendar event IDs.
+        - Never ask the user for an event ID.
+        - If the user wants to delete an event but does not provide an ID, use get_events to locate the event.
+        - Only ask for clarification if multiple matching events exist.
 
-        Constraints:
-        Do not reply theatrically
-        Do not overexplain
-        Do not be verbose
-        """
+        Tool usage:
+        - Tools are internal.
+        - Never mention internal reasoning.
+        - Use tools only when they are required to answer the user's request.
+        - Never use tools for greetings or casual conversation.
+
+        Conversation:
+        - If a request is unclear, ask a brief clarifying question.
+        - Do not assume information that the user has not provided.
+
+        Personality:
+        - Calm, precise, efficient.
+        - Slightly formal.
+        - Concise.
+        - Address the user as "sir" naturally, not constantly.
+
+        Safety:
+        - Confirm before destructive actions."""
 
     def think(self, conversation):
-        messages = [{"role": "system", "content": self.system_prompt}] + conversation
-        response = ollama.chat(model=self.model, messages= messages) #initialize the ollama chat model with the conversation history
-        return response["message"]["content"]
+        messages = [{"role": "system", "content": self.build_system_prompt()}] + conversation
+
+        while True:
+            #initialize the ollama chat model with the conversation history
+            response = ollama.chat(model=self.model, messages= messages, tools = list(self.available_functions.values()))
+            #add assistant response to the conversation
+            messages.append(response.message.model_dump())
+
+            if response.message.tool_calls:
+                for tool in response.message.tool_calls:
+                    function_name = tool.function.name
+                    args = tool.function.arguments
+                    print(f"Calling tool: {function_name} with args: {args}")
+                    # Avoid calling delete_event without a valid event_id
+                    if function_name == "delete_event":
+                        if not args.get("event_id"):
+                            result = "Missing event ID. Retrieve events first."
+                            messages.append({
+                            "role": "tool",
+                            "tool_name": function_name,
+                            "content": str(result)
+                            })
+                            continue
+
+                    function = self.available_functions[function_name]
+                    try:
+                        result = function(**args)
+
+                    except Exception as e:
+                        print(f"Error occurred while calling tool: {e}")
+                        result = {"success": False, "error": str(e)}
+
+                    messages.append({'role': 'tool', "tool_name": function_name, "content": str(result)})
+
+            else:
+                #No tool call
+                return response.message.content
+
+            
 
 class Conversation:
     def __init__(self, saved_messages=None):
@@ -99,13 +154,16 @@ class Conversation:
 class Ayo:
     def __init__(self):
         self.memory = Memory()
-        self.brain = Brain()
+        self.calendar = CalendarTool()
+        #self.calendar.debug_calendar_identity() for debugging
+        self.brain = Brain(self.calendar)
+        
         saved_messages = self.memory.load_memory()
         self.conversation = Conversation(saved_messages)
-        self.calendar = CalendarTool
 
 
     def run(self):
+        
         while True: #talk to ayo until user types "quit"
             user_input = input("You: ")
 
@@ -120,9 +178,3 @@ class Ayo:
     
             assistant_message = self.conversation.add_assistant_message(answer)#save assistant response to conversation1
             self.memory.save_memory(assistant_message)
-
-            calendar = CalendarTool()
-            summary = input()
-            start = input()
-            end = input()
-            calendar.schedule_event(summary, start, end)
