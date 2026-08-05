@@ -52,6 +52,7 @@ class Brain:
 
         Today's date and time is {now} (America/New_York)
         Interpret words such as "today", "tomorrow", and "next Monday" relative to this date.
+
         
 
         Your highest priority is to respond naturally and helpfully.
@@ -60,17 +61,15 @@ class Brain:
         - Always reply to greetings.
         - A simple "Hello, sir." is sufficient.
 
-        Calendar deletion behavior:
-        - Users do not know calendar event IDs.
-        - Never ask the user for an event ID.
-        - If the user wants to delete an event but does not provide an ID, use get_events to locate the event.
-        - Only ask for clarification if multiple matching events exist.
-
         Tool usage:
         - Tools are internal.
-        - Never mention internal reasoning.
         - Use tools only when they are required to answer the user's request.
         - Never use tools for greetings or casual conversation.
+        - Use the calendar tool to schedule, retrieve, or delete events from the user's Google Calendar. 
+        - Always use calendar tool functions when the user asks about their schedule or wants to manage events.
+        -get_events: Use this function to retrieve events from the user's calendar.
+        -schedule_event: Use this function to schedule events in the user's calendar.
+        -delete_event: Use this function to delete or remove events from the user's calendar.
 
         Conversation:
         - If a request is unclear, ask a brief clarifying question.
@@ -113,6 +112,7 @@ class Brain:
                     function = self.available_functions[function_name]
                     try:
                         result = function(**args)
+                        print(f"Tool returned: {result}")
 
                     except Exception as e:
                         print(f"Error occurred while calling tool: {e}")

@@ -134,7 +134,6 @@ class CalendarTool:
         return clean_events
 
 
-#USING WRONG FORMAT!!! AGAIN
     def delete_event(self, title: str, date: str, start_time: str = None):
         """Deletes an event from the user's calendar.
 
@@ -143,25 +142,42 @@ class CalendarTool:
         Args:
         title: The title of the event to delete.
         date: The date of the event to delete in YYYY-MM-DD format.
-        start_time: The start time of the event to delete in HH:MM format.
+        start_time: Optional start time in HH:MM format.
 
         Returns:
-        Nothing. The event is removed from the calendar.
+        Information about the deleted event
         """
         # Create beginning and end of the requested day
         time_min = f"{date}T00:00:00"
         time_max = f"{date}T23:59:59"
 
-        # Find the event using get_events
+        #find the event using get_events
         events = self.get_events(time_min=time_min, time_max=time_max)
-        event_id = None
+
+        matches =[]
+
         for event in events:
-            if event.get("title") and title.lower() in event["title"].lower() and (start_time is None or event["start"].startswith(f"{date}T{start_time}")):
-                event_id = event["id"]
-                break
+            event_title = event.get("title", "")
+            event_start = event.get("start", "")
 
-        if not event_id:
-            raise ValueError("Event not found.")
+            if title.lower() not in event_title.lower():
+                continue
 
-        self.service.events().delete(calendarId="primary", eventId = event_id, sendUpdates="all").execute()
-        return f"{title} has been deleted from your calendar."
+            if start_time:
+                if not event_start.startswith(f"{date}T{start_time}"):
+                    continue
+
+            matches.append(event)
+
+        #No matches found
+        if len(matches) == 0:
+            return {"success": False, "message": "No matching event found."}
+
+        if len(matches) > 1:
+            return {"success": False, "message": "Multiple matching events found.", "matches": [{"title": e["title"], "start": e["start"]} for e in matches]}
+
+        event = matches[0]
+
+        self.service.events().delete(calendarId="primary", eventId=event["id"], sendUpdates="all").execute()
+
+        return {"success": True, "message": f"Deleted event: {event['title']} at {event['start']}"}
