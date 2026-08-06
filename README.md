@@ -19,10 +19,20 @@ Ayo is a local AI assistant built in Python using Ollama and Google Calendar API
 - SQLite
 - Google Calendar API
 
-## Current Status
+## Future Plans
 
 Ayo is actively being developed. Future improvements include:
 - Voice integration
+- Email integration
 - More tools
 - Improved planning/reasoning
 - Better memory systems
+- Web search capability
+
+## Author
+
+MacElyon Akinbanjo
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details
