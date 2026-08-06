@@ -6,6 +6,7 @@ Ayo is a local AI assistant built in Python using Ollama and Google Calendar API
 ## Getting Started
 
 ### Pre-requisites
+- Install your preferred IDE e.g. Visual Studio Code
 - Clone the repository
 - Python
 - Ollama installed and running locally
@@ -68,7 +69,7 @@ Ayo is actively being developed. Future improvements include:
 
 ## Known Limitations
 
-- Ayo can misinterpret relative dates e.g "today", "tomorrow". Has to be fixed using datetime in the system prompt to tell it what the current date is
+- Ayo can misinterpret relative dates e.g. "today", "tomorrow". Has to be fixed using datetime in the system prompt to tell it what the current date is
 - Ayo may hallucinate using prompts. Fixed by gving it tool usage rules in the system prompt
 
 ## Author
